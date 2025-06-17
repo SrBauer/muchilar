@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -21,14 +22,17 @@ import com.example.mochilar.data.Travel
 import com.example.mochilar.viewmodel.TravelViewModel
 import com.example.mochilar.R
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.items
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId: Int) {
     var travels by remember { mutableStateOf<List<Travel>>(emptyList()) }
-
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    var showSugestaoDialog by remember { mutableStateOf(false) }
+    var sugestaoUsuario by remember { mutableStateOf("") }
+    var travelSelecionado by remember { mutableStateOf<Travel?>(null) }
 
     LaunchedEffect(userId) {
         if (userId > 0) {
@@ -37,10 +41,11 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)) {
-
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
             Text("Minhas Viagens", style = MaterialTheme.typography.headlineMedium)
 
             if (travels.isEmpty()) {
@@ -53,9 +58,7 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
                 ) {
                     items(travels, key = { it.id }) { travel ->
                         val dismissState = rememberSwipeToDismissBoxState()
-                        val coroutineScope = rememberCoroutineScope()
 
-                        // Swipe para deletar ou gerar roteiro
                         SwipeToDismissBox(
                             state = dismissState,
                             enableDismissFromStartToEnd = true,
@@ -142,17 +145,10 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
                                 }
 
                                 SwipeToDismissBoxValue.EndToStart -> {
-                                    coroutineScope.launch {
-                                        try {
-                                            val roteiro = viewModel.gerarRoteiroGemini(travel)
-                                            val encodedRoteiro = Uri.encode(roteiro)
-                                            navController.navigate("roteiroIA/$encodedRoteiro")
-                                        } catch (e: Exception) {
-                                            snackbarHostState.showSnackbar("Erro: ${e.localizedMessage}")
-                                        } finally {
-                                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-                                        }
-                                    }
+                                    travelSelecionado = travel
+                                    sugestaoUsuario = ""
+                                    showSugestaoDialog = true
+                                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
                                 }
 
                                 else -> Unit
@@ -166,6 +162,43 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+
+    if (showSugestaoDialog && travelSelecionado != null) {
+        AlertDialog(
+            onDismissRequest = { showSugestaoDialog = false },
+            title = { Text("Deseja algo específico no roteiro?") },
+            text = {
+                OutlinedTextField(
+                    value = sugestaoUsuario,
+                    onValueChange = { sugestaoUsuario = it },
+                    label = { Text("Sugestão personalizada") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSugestaoDialog = false
+                    coroutineScope.launch {
+                        travelSelecionado?.let { travel ->
+                            viewModel.gerarRoteiroPersonalizado(travel, sugestaoUsuario) { roteiro ->
+                                coroutineScope.launch {
+                                    viewModel.salvarRoteiroIA(travel.id, roteiro)
+                                    val encoded = Uri.encode(roteiro)
+                                    navController.navigate("roteiroIA/$encoded")
+                                }
+                            }
+                        }
+                    }
+                }) {
+                    Text("Gerar roteiro por IA")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSugestaoDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
         )
     }
 }

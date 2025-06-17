@@ -11,5 +11,6 @@ data class Travel(
     val travelType: String,
     val startDate: String,
     val endDate: String,
-    val budget: Double
+    val budget: Double,
+    val roteiroIA: String? = null
 )

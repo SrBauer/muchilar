@@ -82,7 +82,6 @@ fun AppNavigation(paddingValues: PaddingValues, database: UserDatabase) {
                         }
                     }
                 )
-
             }
         },
         bottomBar = {
@@ -137,9 +136,15 @@ fun AppNavigation(paddingValues: PaddingValues, database: UserDatabase) {
             }
             composable("roteiroIA/{roteiro}") { backStackEntry ->
                 val roteiro = backStackEntry.arguments?.getString("roteiro") ?: ""
-                RoteiroIAScreen(roteiro = roteiro) {
-                    navController.popBackStack()
-                }
+                RoteiroIAScreen(
+                    roteiro = roteiro,
+                    onBack = { navController.popBackStack() },
+                    onNovaSugestao = { novoRoteiro ->
+                        navController.navigate("roteiroIA/$novoRoteiro") {
+                            popUpTo("roteiroIA/$roteiro") { inclusive = true }
+                        }
+                    }
+                )
             }
         }
     }
