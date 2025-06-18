@@ -23,6 +23,8 @@ import com.example.mochilar.viewmodel.TravelViewModel
 import com.example.mochilar.R
 import kotlinx.coroutines.launch
 
+// ... (imports permanecem os mesmos)
+// ... (imports permanecem os mesmos)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId: Int) {
@@ -37,6 +39,11 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
     LaunchedEffect(userId) {
         if (userId > 0) {
             travels = viewModel.getTravelsByUser(userId)
+            travels.forEach { travel ->
+                if (travel.roteiroIA.isNullOrBlank()) {
+                    viewModel.gerarRoteiro(travel)
+                }
+            }
         }
     }
 
@@ -181,13 +188,11 @@ fun HomeScreen(navController: NavController, viewModel: TravelViewModel, userId:
                     showSugestaoDialog = false
                     coroutineScope.launch {
                         travelSelecionado?.let { travel ->
-                            viewModel.gerarRoteiroPersonalizado(travel, sugestaoUsuario) { roteiro ->
-                                coroutineScope.launch {
-                                    viewModel.salvarRoteiroIA(travel.id, roteiro)
-                                    val encoded = Uri.encode(roteiro)
-                                    navController.navigate("roteiroIA/$encoded")
-                                }
-                            }
+                            viewModel.gerarRoteiroPersonalizado(travel, sugestaoUsuario)
+                            travels = viewModel.getTravelsByUser(userId)
+                            val roteiro = viewModel.roteiroIA.value
+                            val encoded = Uri.encode(roteiro)
+                            navController.navigate("roteiroIA/$encoded")
                         }
                     }
                 }) {

@@ -40,7 +40,9 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
                 """.trimIndent()
 
                 val response = generativeModel.generateContent(content { text(promptText) })
-                _roteiroIA.value = response.text ?: "Não foi possível gerar o roteiro no momento."
+                val roteiro = response.text ?: "Não foi possível gerar o roteiro no momento."
+                _roteiroIA.value = roteiro
+                salvarRoteiroIA(travel.id, roteiro)
             } catch (e: Exception) {
                 Log.e("TravelViewModel", "Erro ao gerar roteiro", e)
                 _roteiroIA.value = "Erro ao gerar roteiro: ${e.message ?: "erro desconhecido"}"
@@ -48,32 +50,30 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
         }
     }
 
-    fun gerarRoteiroPersonalizado(travel: Travel, sugestaoUsuario: String, onResult: (String) -> Unit) {
+    fun gerarRoteiroPersonalizado(travel: Travel, sugestaoUsuario: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val generativeModel = GenerativeModel(
                     modelName = "models/gemini-2.0-flash",
                     apiKey = apiKey
                 )
-
                 val promptText = """
-                    Você é um assistente de viagens. Crie um roteiro diário e conciso para uma viagem ao destino "${travel.destination}".
-                    A viagem ocorre de ${travel.startDate} a ${travel.endDate}, sendo do tipo "${travel.travelType}", com orçamento de R$${"%.2f".format(travel.budget)}.
-                    
-                    O usuário deseja o seguinte no roteiro: "${sugestaoUsuario}".
-                    
-                    Forneça o roteiro apenas em texto simples, em português, sem formatação Markdown.
+                    Você é um assistente de viagens. Crie um roteiro diário e conciso para a viagem ao destino "${travel.destination}".
+                    A viagem ocorre de ${travel.startDate} a ${travel.endDate}, sendo uma viagem do tipo "${travel.travelType}".
+                    O orçamento total disponível é de R${'$'}${"%.2f".format(travel.budget)}.
+
+                    O usuário deseja: "$sugestaoUsuario".
+
+                    **Importante:** A resposta deve estar completamente em **português** e **não deve conter nenhuma formatação Markdown**. Apenas texto simples.
                 """.trimIndent()
 
                 val response = generativeModel.generateContent(content { text(promptText) })
-                withContext(Dispatchers.Main) {
-                    onResult(response.text ?: "Não foi possível gerar o roteiro.")
-                }
+                val roteiro = response.text ?: "Não foi possível gerar o roteiro."
+                _roteiroIA.value = roteiro
+                salvarRoteiroIA(travel.id, roteiro)
             } catch (e: Exception) {
                 Log.e("TravelViewModel", "Erro ao gerar roteiro personalizado", e)
-                withContext(Dispatchers.Main) {
-                    onResult("Erro ao gerar roteiro: ${e.message ?: "erro desconhecido"}")
-                }
+                _roteiroIA.value = "Erro: ${e.message ?: "desconhecido"}"
             }
         }
     }
